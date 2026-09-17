@@ -1375,9 +1375,9 @@ function initModelPicker({ idPrefix, endpoint, annotateLocalAvailability = false
     custom.classList.toggle("hidden", select.value !== MODEL_PICKER_CUSTOM_VALUE);
   });
 
-  applyBtn.addEventListener("click", async () => {
-    const model =
-      select.value === MODEL_PICKER_CUSTOM_VALUE ? custom.value.trim() : select.value;
+  async function setModel(model) {
+    model = model.trim();
+
     if (!model) {
       status.textContent = "Bitte einen Modellnamen angeben.";
       status.className = "model-picker-status error";
@@ -1387,20 +1387,26 @@ function initModelPicker({ idPrefix, endpoint, annotateLocalAvailability = false
     applyBtn.disabled = true;
     status.textContent = "Wird übernommen…";
     status.className = "model-picker-status";
+
     try {
       const response = await fetch(`/api/settings/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model }),
       });
+
       const data = await response.json();
+
       if (!response.ok) {
         status.textContent = data.error || "Übernehmen fehlgeschlagen.";
         status.className = "model-picker-status error";
         return;
       }
+
       status.textContent = `Aktives Modell: ${data.model}`;
       status.className = "model-picker-status success";
+
+      await load();
       await loadDependencies();
     } catch (err) {
       status.textContent = "Übernehmen fehlgeschlagen: Verbindung zum Server nicht möglich.";
@@ -1408,9 +1414,16 @@ function initModelPicker({ idPrefix, endpoint, annotateLocalAvailability = false
     } finally {
       applyBtn.disabled = false;
     }
+  }
+
+  applyBtn.addEventListener("click", async () => {
+    const model =
+      select.value === MODEL_PICKER_CUSTOM_VALUE ? custom.value.trim() : select.value;
+
+    await setModel(model);
   });
 
-  return { load };
+  return { load, setModel };
 }
 
 const lmstudioModelPicker = initModelPicker({
@@ -1420,7 +1433,7 @@ const lmstudioModelPicker = initModelPicker({
 });
 const whisperModelPicker = initModelPicker({ idPrefix: "whisper-model", endpoint: "whisper-model" });
 
-// Dedicated "which Ollama models are already pulled" list — independent of
+// Available LM Studio chat models — independent of
 // (and, for simplicity, fetching separately from) ollamaModelPicker's own
 // annotation fetch above; this app already treats each Systemstatus piece
 // as its own independent fire-and-forget load (see openStatusModal()), and
@@ -1431,21 +1444,43 @@ async function loadLocalLMStudioModels() {
   try {
     const response = await fetch("/api/lmstudio-models");
     if (!response.ok) return;
-    const models = await response.json();
+
+    const allModels = await response.json();
+
+    const models = allModels.filter((model) => {
+      const name = model.name.toLowerCase();
+      return !name.includes("embedding") && !name.includes("embed-text");
+    });
+
     lmstudioLocalModelsList.innerHTML = "";
     lmstudioLocalModelsList.classList.toggle("hidden", models.length === 0);
+
     for (const model of models) {
       const li = document.createElement("li");
+
       li.textContent = model.name;
-      const size = document.createElement("span");
-      size.className = "ollama-local-model-size";
-      size.textContent = model.size;
-      li.appendChild(size);
+      li.title = `${model.name} als aktives Modell verwenden`;
+      li.setAttribute("role", "button");
+      li.setAttribute("tabindex", "0");
+
+      const activateModel = async () => {
+        await lmstudioModelPicker.setModel(model.name);
+        await loadLocalLMStudioModels();
+      };
+
+      li.addEventListener("click", activateModel);
+
+      li.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          await activateModel();
+        }
+      });
+
       lmstudioLocalModelsList.appendChild(li);
     }
   } catch (err) {
-    // Nice-to-have display — silently skip on failure, same as the
-    // picker's own annotation fetch above.
+    // Die Liste ist optional; das normale Modellfeld bleibt nutzbar.
   }
 }
 

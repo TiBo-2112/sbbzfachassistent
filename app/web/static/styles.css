@@ -1523,3 +1523,7 @@ body {
     border-bottom: 1px solid var(--border);
   }
 }
+
+.lmstudio-local-models-list li {
+  cursor: pointer;
+}

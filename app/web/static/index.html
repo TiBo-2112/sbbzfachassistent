@@ -364,9 +364,9 @@
             lokaler KI-Durchlauf das rohe Transkript auf offensichtliche Erkennungsfehler und
             korrigiert nur eindeutig unsinnige Stellen — Stil, Wortwahl und Satzbau bleiben
             unangetastet. Läuft vor der eigentlichen Anonymisierung, damit auch die
-            PII-Erkennung vom bereinigten Text profitiert. Ist kein Ollama erreichbar, wird
-            einfach das unkorrigierte Transkript verwendet — Audio-Transkription funktioniert
-            also weiterhin auch ohne installiertes Ollama.
+            PII-Erkennung vom bereinigten Text profitiert. Ist LM Studio nicht erreichbar,
+            wird einfach das unkorrigierte Transkript verwendet — die Audio-Transkription
+            funktioniert also weiterhin auch ohne laufendes Sprachmodell.
           </dd>
           <dt>Einzelne Textstelle oder ganze Kategorie abwählen</dt>
           <dd>
@@ -424,14 +424,13 @@
         <h3>Lokale KI-Komponenten &amp; Installation</h3>
         <p>Die App nutzt zwei Arten lokaler KI-Modelle, beide laufen vollständig auf diesem Rechner:</p>
         <dl>
-          <dt>Ollama (Sprachmodell)</dt>
+          <dt>LM Studio (Sprachmodell)</dt>
           <dd>
             Wird für den Tiefencheck, die Zusammenfassung und die automatische
-            Transkript-Korrektur gebraucht. Falls nicht installiert:
-            <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">ollama.com/download</a>,
-            danach das gewählte Modell laden (z. B. <code>ollama pull gemma4:e4b</code>). Welches Modell
-            verwendet wird, lässt sich oben im Systemstatus per Dropdown umstellen — kleinere Modelle
-            brauchen weniger RAM/VRAM, größere liefern bessere Ergebnisse.
+            Transkript-Korrektur gebraucht. LM Studio muss lokal installiert und der lokale
+            API-Server gestartet sein. Die in LM Studio verfügbaren Modelle werden automatisch
+            erkannt; das gewünschte Modell lässt sich oben im Systemstatus auswählen.
+            Modelle werden direkt in LM Studio heruntergeladen und verwaltet.
           </dd>
           <dt>faster-whisper (Spracherkennung)</dt>
           <dd>
@@ -444,9 +443,10 @@
           <dd>Werden für die Grunderkennung (Namen, Orte, …) gebraucht, einmalig zu installieren.</dd>
         </dl>
         <p>
-          Der Bereich <strong>„Systemstatus"</strong> oben in der App zeigt an, was davon fehlt, und
-          kann fehlende Modelle direkt nachladen. Nur eine bereits vorausgesetzte Ollama-Installation
-          muss manuell eingerichtet werden.
+          Der Bereich <strong>„Systemstatus"</strong> oben in der App zeigt an, welche lokalen
+          Komponenten verfügbar sind. spaCy-Modelle können bei Bedarf durch die App eingerichtet
+          werden. LM Studio selbst sowie die dort verwendeten Sprachmodelle werden direkt in
+          LM Studio installiert und verwaltet.
         </p>
       </section>
 
@@ -455,7 +455,7 @@
         <ul class="help-privacy-list">
           <li><strong>Alles läuft lokal.</strong> Es gibt keine Cloud-Anbindung und keinen externen API-Aufruf — weder für die Dokumentenanalyse noch für die KI-Auswertung.</li>
           <li><strong>Rohdaten verlassen nie diesen Rechner.</strong> Hochgeladene Dateien werden nur temporär auf der Festplatte zwischengespeichert und nach der Analyse sofort gelöscht.</li>
-          <li><strong>Das Sprachmodell (Ollama) läuft ausschließlich lokal auf diesem Rechner — nie über eine Cloud oder das Internet.</strong> Der erste Tiefencheck-Durchlauf sieht dafür bewusst den Originaltext (siehe „Tiefencheck" oben), damit er Spitznamen und Rollenbezeichnungen korrekt der richtigen Person zuordnen kann; ein zweiter Durchlauf nach der Anonymisierung sowie die Zusammenfassung sehen dagegen den bereits fertig anonymisierten Text. Bei Audio-Eingaben sieht auch die automatische Transkript-Korrektur (siehe oben) bewusst den noch unbearbeiteten Text, bevor irgendetwas geschwärzt wird. Ist die Anonymisierung bewusst ausgeschaltet, erhält auch die Zusammenfassung den Originaltext — auch dann bleibt die Verarbeitung vollständig lokal.</li>
+          <li><strong>Das Sprachmodell läuft über den lokalen LM-Studio-Server auf diesem Rechner.</strong> Die App verwendet dafür ausschließlich die lokale Adresse <code>127.0.0.1</code>. Der erste Tiefencheck-Durchlauf sieht bewusst den Originaltext (siehe „Tiefencheck" oben), damit Spitznamen und Rollenbezeichnungen korrekt erkannt werden können; ein zweiter Durchlauf nach der Anonymisierung sowie die Zusammenfassung sehen dagegen den bereits anonymisierten Text. Bei Audio-Eingaben sieht auch die automatische Transkript-Korrektur bewusst den noch unbearbeiteten Text. Ist die Anonymisierung ausgeschaltet, erhält auch die Zusammenfassung den Originaltext.</li>
           <li><strong>Ergebnisdateien liegen lokal.</strong> Anonymisierte Dokumente werden in einem lokalen Ordner dieser App gespeichert und stehen nur auf diesem Rechner zur Verfügung.</li>
           <li><strong>Keine Analyse, kein Tracking.</strong> Diese App sammelt keine Nutzungsdaten und sendet nichts an Dritte.</li>
           <li><strong>Auf Updates prüfen ist die einzige externe Verbindung.</strong> Der Systemstatus-Bereich fragt beim Start automatisch (und jederzeit erneut per Klick) bei GitHub ab, ob eine neuere Version verfügbar ist. Dabei werden ausschließlich die installierte Versionsnummer und die öffentliche GitHub-Release-API abgefragt — niemals Dokumenteninhalte, Dateinamen oder sonstige Daten.</li>
