@@ -205,19 +205,36 @@ fileClearBtn.addEventListener("click", clearSelectedFile);
 
 clipboardBtn.addEventListener("click", async () => {
   try {
-    const text = await navigator.clipboard.readText();
+    let text = "";
+
+    // In the desktop app use the native pywebview/Python bridge.
+    // In a normal browser fall back to the standard Clipboard API.
+    if (
+      window.pywebview &&
+      window.pywebview.api &&
+      window.pywebview.api.get_clipboard_text
+    ) {
+      text = await window.pywebview.api.get_clipboard_text();
+    } else {
+      text = await navigator.clipboard.readText();
+    }
+
     if (!text || !text.trim()) {
       showError("Die Zwischenablage enthält keinen Text.");
       return;
     }
+
     clearSelectedFile();
+
     clipboardPreview.value = text;
     clipboardPreviewWrap.classList.remove("hidden");
+
     hideError();
     updateStep1Readiness();
   } catch (err) {
+    console.error("Clipboard access failed:", err);
     showError(
-      "Zugriff auf die Zwischenablage nicht möglich. Bitte Berechtigung erteilen oder den Text manuell einfügen."
+      "Zugriff auf die Zwischenablage nicht möglich. Der Text kann alternativ als Datei geladen werden."
     );
   }
 });
