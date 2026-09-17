@@ -32,6 +32,19 @@ APP_DATA_DIR = _app_data_dir()
 OUTPUT_DIR = Path(os.environ.get("ANONYMIZER_OUTPUT_DIR", str(APP_DATA_DIR / "output")))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# LM Studio — local OpenAI-compatible API server.
+# Keep this bound to localhost for local-only document processing.
+LMSTUDIO_BASE_URL = os.environ.get(
+    "LMSTUDIO_BASE_URL",
+    "http://127.0.0.1:1234/v1",
+)
+
+# Default model used when no model has been selected in the UI yet.
+LMSTUDIO_MODEL = os.environ.get(
+    "LMSTUDIO_MODEL",
+    "qwen/qwen3.5-9b",
+)
+
 # Ollama — OLLAMA_HOST must be overridable: inside a Docker container,
 # "localhost" refers to the container itself, not the host machine (or a
 # sibling "ollama" container), so the default only works for the native

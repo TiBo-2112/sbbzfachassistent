@@ -61,12 +61,7 @@ from app.config import (
 )
 from app.pipeline.pipeline import PendingState, analyze, analyze_file, finalize
 from app.pipeline.render_markdown import render_summary, render_transcript
-from app.pipeline.setup_check import (
-    attempt_auto_install,
-    check_dependencies,
-    list_lmstudio_models,
-    list_ollama_models,
-)
+from app.pipeline.setup_check import attempt_auto_install, check_dependencies, list_ollama_models
 from app.progress_calibration import get_stage_durations, record_stage_duration
 from app.schemas import (
     DetectedCategory,
@@ -83,10 +78,8 @@ from app.schemas import (
     VersionInfo,
 )
 from app.settings import (
-    get_lmstudio_model,
     get_ollama_model,
     get_whisper_model_size,
-    set_lmstudio_model,
     set_ollama_model,
     set_whisper_model_size,
 )
@@ -116,12 +109,7 @@ class DependencyFixRequest(BaseModel):
     name: str
 
 
-class LMStudioModelRequest(BaseModel):
-    model: str
-
-
 class OllamaModelRequest(BaseModel):
-    """Legacy compatibility request model during LM Studio migration."""
     model: str
 
 
@@ -414,7 +402,7 @@ def _recompute_progress(job: _Job) -> None:
 
 
 def _make_callbacks(job: _Job):
-    job.model = get_lmstudio_model()
+    job.model = get_ollama_model()
     job.whisper_model = get_whisper_model_size()
 
     def on_plan(plan: list[tuple[str, int]]) -> None:
@@ -780,15 +768,9 @@ def get_dependencies() -> list[dict]:
     return [status.model_dump() for status in check_dependencies()]
 
 
-@app.get("/api/lmstudio-models")
-def get_lmstudio_models() -> list[dict]:
-    return list_lmstudio_models()
-
-
-# Temporary compatibility alias for the existing frontend.
 @app.get("/api/ollama-models")
 def get_ollama_models() -> list[dict]:
-    return list_lmstudio_models()
+    return list_ollama_models()
 
 
 def _run_dependency_fix_job(job: _Job, name: str) -> None:
@@ -818,36 +800,18 @@ def fix_dependency(payload: DependencyFixRequest) -> JSONResponse:
     return JSONResponse({"job_id": job_id})
 
 
-@app.get("/api/settings/lmstudio-model")
-def get_lmstudio_model_setting() -> dict:
-    return {
-        "model": get_lmstudio_model(),
-        "curated": [],
-    }
-
-
-@app.post("/api/settings/lmstudio-model")
-def set_lmstudio_model_setting(payload: LMStudioModelRequest) -> JSONResponse:
-    try:
-        model = set_lmstudio_model(payload.model)
-    except ValueError as exc:
-        return JSONResponse(status_code=400, content={"error": str(exc)})
-    return JSONResponse({"model": model})
-
-
-# Temporary compatibility aliases for the existing frontend.
 @app.get("/api/settings/ollama-model")
 def get_ollama_model_setting() -> dict:
     return {
-        "model": get_lmstudio_model(),
-        "curated": [],
+        "model": get_ollama_model(),
+        "curated": CURATED_OLLAMA_MODELS,
     }
 
 
 @app.post("/api/settings/ollama-model")
 def set_ollama_model_setting(payload: OllamaModelRequest) -> JSONResponse:
     try:
-        model = set_lmstudio_model(payload.model)
+        model = set_ollama_model(payload.model)
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
     return JSONResponse({"model": model})

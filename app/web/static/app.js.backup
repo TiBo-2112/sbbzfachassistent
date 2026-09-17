@@ -1353,7 +1353,7 @@ function initModelPicker({ idPrefix, endpoint, annotateLocalAvailability = false
       let localModelNames = null;
       if (annotateLocalAvailability) {
         try {
-          const modelsResponse = await fetch("/api/lmstudio-models");
+          const modelsResponse = await fetch("/api/ollama-models");
           if (modelsResponse.ok) {
             const models = await modelsResponse.json();
             localModelNames = new Set(models.map((m) => m.name));
@@ -1413,9 +1413,9 @@ function initModelPicker({ idPrefix, endpoint, annotateLocalAvailability = false
   return { load };
 }
 
-const lmstudioModelPicker = initModelPicker({
-  idPrefix: "lmstudio-model",
-  endpoint: "lmstudio-model",
+const ollamaModelPicker = initModelPicker({
+  idPrefix: "ollama-model",
+  endpoint: "ollama-model",
   annotateLocalAvailability: true,
 });
 const whisperModelPicker = initModelPicker({ idPrefix: "whisper-model", endpoint: "whisper-model" });
@@ -1425,15 +1425,15 @@ const whisperModelPicker = initModelPicker({ idPrefix: "whisper-model", endpoint
 // annotation fetch above; this app already treats each Systemstatus piece
 // as its own independent fire-and-forget load (see openStatusModal()), and
 // this is a single cheap local request, not worth coordinating.
-const lmstudioLocalModelsList = document.getElementById("lmstudio-local-models-list");
+const ollamaLocalModelsList = document.getElementById("ollama-local-models-list");
 
-async function loadLocalLMStudioModels() {
+async function loadLocalOllamaModels() {
   try {
-    const response = await fetch("/api/lmstudio-models");
+    const response = await fetch("/api/ollama-models");
     if (!response.ok) return;
     const models = await response.json();
-    lmstudioLocalModelsList.innerHTML = "";
-    lmstudioLocalModelsList.classList.toggle("hidden", models.length === 0);
+    ollamaLocalModelsList.innerHTML = "";
+    ollamaLocalModelsList.classList.toggle("hidden", models.length === 0);
     for (const model of models) {
       const li = document.createElement("li");
       li.textContent = model.name;
@@ -1441,7 +1441,7 @@ async function loadLocalLMStudioModels() {
       size.className = "ollama-local-model-size";
       size.textContent = model.size;
       li.appendChild(size);
-      lmstudioLocalModelsList.appendChild(li);
+      ollamaLocalModelsList.appendChild(li);
     }
   } catch (err) {
     // Nice-to-have display — silently skip on failure, same as the
@@ -1455,9 +1455,9 @@ function openStatusModal() {
   statusModal.classList.remove("hidden");
   document.body.classList.add("modal-open");
   loadDependencies();
-  lmstudioModelPicker.load();
+  ollamaModelPicker.load();
   whisperModelPicker.load();
-  loadLocalLMStudioModels();
+  loadLocalOllamaModels();
   // Show whatever the automatic on-load check already found immediately
   // (no need to wait on a fresh network round trip just to open the
   // panel); the "Auf Updates prüfen" button still forces a fresh one.

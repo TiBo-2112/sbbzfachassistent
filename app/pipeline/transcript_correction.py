@@ -76,7 +76,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from app.llm.ollama_client import generate
+from app.llm.client import generate
 
 # Low, near-deterministic temperature — this is a conservative correction
 # task, not creative generation (mirrors deep_check.py's

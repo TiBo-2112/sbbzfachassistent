@@ -16,6 +16,7 @@ import threading
 
 from app.config import APP_DATA_DIR
 from app.config import OLLAMA_MODEL as _DEFAULT_OLLAMA_MODEL
+from app.config import LMSTUDIO_MODEL as _DEFAULT_LMSTUDIO_MODEL
 from app.config import WHISPER_MODEL_SIZE as _DEFAULT_WHISPER_MODEL_SIZE
 
 _SETTINGS_PATH = APP_DATA_DIR / "settings.json"
@@ -54,6 +55,16 @@ def get_ollama_model() -> str:
 def set_ollama_model(name: str) -> str:
     return _set_setting("ollama_model", name)
 
+def get_lmstudio_model() -> str:
+    return _get_setting(
+        "lmstudio_model",
+        "LMSTUDIO_MODEL",
+        _DEFAULT_LMSTUDIO_MODEL,
+    )
+
+
+def set_lmstudio_model(name: str) -> str:
+    return _set_setting("lmstudio_model", name)
 
 def get_whisper_model_size() -> str:
     return _get_setting("whisper_model_size", "WHISPER_MODEL_SIZE", _DEFAULT_WHISPER_MODEL_SIZE)

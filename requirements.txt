@@ -18,3 +18,4 @@ ollama
 langdetect
 jinja2
 certifi
+openai

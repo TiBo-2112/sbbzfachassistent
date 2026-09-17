@@ -89,7 +89,7 @@ import json
 import re
 from typing import Callable
 
-from app.llm.ollama_client import generate
+from app.llm.client import generate
 from app.pipeline.occurrences import OccurrenceRef, occurrences_for_text_match
 from app.schemas import AnonymizeResult, DetectedCategory, PiiEntity
 

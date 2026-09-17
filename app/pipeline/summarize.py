@@ -24,7 +24,7 @@ rather than one flat lookup table.
 
 from __future__ import annotations
 
-from app.llm.ollama_client import generate
+from app.llm.client import generate
 from app.schemas import SummaryStyle
 
 _SYSTEM_ANONYMIZED_COMPACT_DE = (
