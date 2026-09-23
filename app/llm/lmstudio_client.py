@@ -58,6 +58,21 @@ def generate(
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
+        # Every call site (deep-check extraction, transcript correction,
+        # summarization) wants fast, low-variance output, never an extended
+        # chain-of-thought — so reasoning/"thinking" is disabled unconditionally
+        # rather than as a per-caller opt-out. `chat_template_kwargs` is the
+        # OpenAI-compatible-server convention (vLLM, LM Studio) for passing a
+        # variable straight into the model's Jinja chat template; Qwen-family
+        # thinking-capable templates read `enable_thinking` from it. Known
+        # unreliable for at least one model as of writing (LM Studio ignores
+        # it for Qwen3.5-9B — https://github.com/lmstudio-ai/lmstudio-bug-tracker/issues/1990,
+        # where thinking still consumes the whole max_tokens budget and
+        # leaves content empty; the documented workaround there is switching
+        # that model's chat template to ChatML in LM Studio's Developer
+        # settings) — kept here anyway since it's harmless when ignored and
+        # correct for whichever models/LM Studio versions do honor it.
+        "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
     }
 
     if temperature is not None:
