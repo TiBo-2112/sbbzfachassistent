@@ -32,8 +32,13 @@ APP_DATA_DIR = _app_data_dir()
 OUTPUT_DIR = Path(os.environ.get("ANONYMIZER_OUTPUT_DIR", str(APP_DATA_DIR / "output")))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# LM Studio — local OpenAI-compatible API server.
-# Keep this bound to localhost for local-only document processing.
+# LM Studio — local OpenAI-compatible API server, this app's only local-LLM
+# backend (see app/llm/lmstudio_client.py). Local-only document processing is
+# a hard privacy requirement (see CLAUDE.md), not just a preference, so this
+# is not merely "kept bound to localhost" by convention: lmstudio_client.py's
+# generate() refuses to run at all if this has been pointed at a non-loopback
+# host, so a misconfigured env var can't silently turn a deep-check/
+# summarize/transcript-correction call into a network call.
 LMSTUDIO_BASE_URL = os.environ.get(
     "LMSTUDIO_BASE_URL",
     "http://127.0.0.1:1234/v1",
@@ -45,57 +50,8 @@ LMSTUDIO_MODEL = os.environ.get(
     "qwen/qwen3.5-9b",
 )
 
-# Ollama — OLLAMA_HOST must be overridable: inside a Docker container,
-# "localhost" refers to the container itself, not the host machine (or a
-# sibling "ollama" container), so the default only works for the native
-# desktop app running directly on the host.
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-# This is the hardcoded/env-var fallback only. The Systemstatus UI lets a
-# user pick a different model at runtime (persisted via app/settings.py); an
-# explicit OLLAMA_MODEL env var (e.g. set by Docker) always wins over that
-# UI choice — see app.settings.get_ollama_model(). gemma4:e4b (also the
-# "recommended" entry in CURATED_OLLAMA_MODELS below) rather than the
-# larger 12b: direct side-by-side testing on real documents showed e4b
-# several times faster with equal or better deep-check recall — the larger
-# model wasn't buying back anything the size cost, at least for this task.
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:e4b")
-
-# Ollama's /api/chat defaults to a small context window (historically 2048
-# tokens) unless a request explicitly asks for more — regardless of how much
-# context the model itself supports. Left unset, a long document could be
-# silently truncated before the model ever sees all of it, with no error.
-# 8192 tokens comfortably covers several times the length of a typical
-# document processed by this app while still bounding the extra KV-cache
-# memory every deep-check/summarize call reserves.
-OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "8192"))
-
-# Curated choices offered in the Systemstatus UI's model picker, covering the
-# realistic RAM/VRAM range end users' machines will have (sizes/RAM figures
-# per ollama.com/library/gemma4 tags, 4-bit quantization). Not exhaustive —
-# the UI also accepts a free-text model name for anything else pulled
-# locally.
-CURATED_OLLAMA_MODELS = [
-    {
-        "name": "gemma4:e2b",
-        "label": "Sehr sparsam (~3 GB) — für Rechner mit wenig RAM/VRAM, keine dedizierte GPU nötig",
-    },
-    {
-        "name": "gemma4:e4b",
-        "label": "Empfohlen (~4,5 GB) — guter Kompromiss aus Qualität und Ressourcenbedarf für die meisten Rechner",
-        "recommended": True,
-    },
-    {
-        "name": "gemma4:12b",
-        "label": "Beste Qualität (~6,7 GB) — braucht mehr RAM/VRAM (mind. 16 GB RAM empfohlen)",
-    },
-    {
-        "name": "gemma4:26b",
-        "label": "Höchste Qualität (~14,4 GB) — für leistungsstarke Maschinen mit viel RAM/dedizierter GPU",
-    },
-]
-
 # faster-whisper — hardcoded/env-var fallback only, same pattern as
-# OLLAMA_MODEL above: the Systemstatus UI lets a user pick a different size
+# LMSTUDIO_MODEL above: the Systemstatus UI lets a user pick a different size
 # at runtime (persisted via app/settings.py), an explicit WHISPER_MODEL_SIZE
 # env var always wins over that UI choice — see
 # app.settings.get_whisper_model_size().

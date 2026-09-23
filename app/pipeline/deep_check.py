@@ -3,8 +3,10 @@
 Only find_missed_pii()/find_missed_locations() carry a privacy invariant:
 both must only ever be called with the true FINAL, fully-processed text
 (post category-exclusion, post person-mode) — not because raw text is
-forbidden from reaching the local model (it isn't; Ollama here is always the
-local, never-networked instance), but because their entire job is to audit
+forbidden from reaching the local model (it isn't; see
+app/llm/lmstudio_client.py's docstring for why LM Studio is guaranteed to be
+the local, never-networked instance this reasoning depends on), but because
+their entire job is to audit
 the actual final output for anything left un-redacted. Auditing the original
 text instead would defeat the purpose.
 
@@ -124,7 +126,7 @@ def _split_into_chunks(
     against the ORIGINAL full text afterwards, never against chunk offsets.
 
     `threshold_words` (not `target_words`) gates whether splitting happens at
-    all — a text under threshold_words isn't worth the extra Ollama round-trip
+    all — a text under threshold_words isn't worth the extra LM Studio round-trip
     even though it's already above target_words, the size chunks are cut to
     once splitting actually is warranted.
     """
@@ -268,7 +270,7 @@ _MISSED_SYSTEM_EN = (
 # A single prompt asking about many different category types at once (names,
 # institutions, reference numbers, AND locations) has weaker recall for any
 # one of them than a pass with only one thing to look for — this trades one
-# more Ollama call for stronger location-specific recall specifically.
+# more LM Studio call for stronger location-specific recall specifically.
 _MISSED_LOCATION_SYSTEM_DE = (
     "Du bist ein Datenschutz-Experte. Der folgende Text wurde bereits automatisch "
     "anonymisiert: erkannte personenbezogene Daten sind bereits durch Platzhalter wie "

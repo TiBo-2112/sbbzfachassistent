@@ -21,10 +21,11 @@ single-unit "ingest" stage, which mixed near-instant text-document parsing
 and multi-minute audio transcription into one shared (and therefore
 text-biased-fast, badly wrong for audio) average.
 
-The four Ollama-backed stages (deep_check_find, deep_check_missed,
-summarize, transcript_correction), plus "transcribe" above, are actually
-stored under a per-model key (e.g. "deep_check_find::gemma4:e4b",
-"transcribe::small") — see app/server.py's _calibration_key() — since a fast
+The LM-Studio-backed stages (deep_check_find, deep_check_missed,
+deep_check_locations, summarize, transcript_correction), plus "transcribe"
+above, are actually stored under a per-model key (e.g.
+"deep_check_find::qwen/qwen3.5-9b", "transcribe::small") — see
+app/server.py's _calibration_key() — since a fast
 and a slow model's real durations are wildly different and averaging them
 together made estimates swing badly whenever the user switched models. This
 module itself just stores whatever key it's given; the per-model

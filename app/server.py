@@ -13,7 +13,7 @@ never sent to or reconstructed from the client.
 
 Background jobs + progress polling: analyze-file/analyze-clipboard/finalize
 can run for minutes (Presidio, spaCy, and — with deep-check on — one or more
-Ollama calls). Rather than blocking the HTTP request for all of that (leaving
+LM Studio calls). Rather than blocking the HTTP request for all of that (leaving
 the frontend with nothing to show but an indefinite spinner), each of these
 three routes starts the actual pipeline call on a background thread and
 returns a `job_id` immediately; the frontend polls GET /api/progress/{job_id}
@@ -26,7 +26,7 @@ Errors from the pipeline call surface as the job's `error` field, not an
 HTTP error status, since they're only known once the poll after they occur.
 
 The pipeline calls (analyze/finalize/dependency-fix) are synchronous, CPU- and
-IO-heavy code (Presidio, spaCy, Ollama HTTP calls, subprocess installs) — the
+IO-heavy code (Presidio, spaCy, LM Studio HTTP calls, subprocess installs) — the
 background-thread job runner above is this app's own mechanism for that, not
 FastAPI's; route handlers that don't spawn a job (dependencies, settings,
 replace-text) stay plain `def`s, not `async def`, so FastAPI's automatic
@@ -53,7 +53,6 @@ from langdetect import LangDetectException, detect
 from pydantic import BaseModel
 
 from app.config import (
-    CURATED_OLLAMA_MODELS,
     CURATED_WHISPER_MODELS,
     DEFAULT_LANGUAGE,
     OUTPUT_DIR,
@@ -65,7 +64,6 @@ from app.pipeline.setup_check import (
     attempt_auto_install,
     check_dependencies,
     list_lmstudio_models,
-    list_ollama_models,
 )
 from app.progress_calibration import get_stage_durations, record_stage_duration
 from app.schemas import (
@@ -84,10 +82,8 @@ from app.schemas import (
 )
 from app.settings import (
     get_lmstudio_model,
-    get_ollama_model,
     get_whisper_model_size,
     set_lmstudio_model,
-    set_ollama_model,
     set_whisper_model_size,
 )
 from app.update_check import check_for_update
@@ -205,17 +201,21 @@ class _Job:
     eta_seconds: float | None = None
     overtime: bool = False
     result: dict | None = None
-    # Only ever set for a dependency-fix job pulling an Ollama model (see
-    # _run_dependency_fix_job) — the ordered terminal-style log lines from
-    # setup_check.py's _ollama_pull_via_http(), re-sent as a full snapshot
-    # on every update (see that function's docstring for why). None for
-    # every other job kind; the frontend treats a present, non-empty list
-    # as "render the terminal-style log" and ignores the field otherwise.
+    # Terminal-style log lines for a dependency-fix job that streams its own
+    # progress (re-sent as a full snapshot on every update). Currently always
+    # None in practice: the one implementation that ever populated this (an
+    # Ollama model pull via setup_check.py's now-removed
+    # _ollama_pull_via_http()) was removed once nothing in the pipeline
+    # called Ollama anymore — LM Studio has no equivalent HTTP pull API to
+    # stream from. Left in place as the mechanism a future streaming
+    # dependency-fix (of any kind) would use; the frontend already treats a
+    # present, non-empty list as "render the terminal-style log" and ignores
+    # the field otherwise.
     pull_log: list[str] | None = None
     _last_event_time: float | None = None
     created_at: float = field(default_factory=time.monotonic)
     # Snapshotted once when the job's callbacks are built (see
-    # _make_callbacks) rather than re-read on every poll — which Ollama
+    # _make_callbacks) rather than re-read on every poll — which LM Studio
     # model/Whisper size is active affects how long the LLM/transcription
     # stages actually take, so calibration for those stages is keyed per-model
     # (see _calibration_key); caching it here avoids re-reading settings.json
@@ -281,11 +281,11 @@ _FALLBACK_STAGE_SECONDS = 5.0
 # honest "taking longer than expected" state.
 _OVERTIME_FACTOR = 1.5
 
-# Stages whose duration depends on which Ollama model is active — mixing
-# measurements from e.g. gemma4:e4b (fast) and gemma4:12b (much slower) into
-# one shared average made the ETA swing wildly and appear to "reset" whenever
-# a chunk finished much faster/slower than a stale, other-model-trained
-# estimate expected (observed directly: switching models between test runs).
+# Stages whose duration depends on which LM Studio model is active — mixing
+# measurements from a fast model and a much slower one into one shared
+# average made the ETA swing wildly and appear to "reset" whenever a chunk
+# finished much faster/slower than a stale, other-model-trained estimate
+# expected (observed directly: switching models between test runs).
 _MODEL_DEPENDENT_STAGES = {
     "deep_check_find",
     "deep_check_missed",
@@ -296,7 +296,7 @@ _MODEL_DEPENDENT_STAGES = {
 
 # Same idea, but for the faster-whisper model size — "tiny" vs "large-v3" can
 # differ several-fold in real transcription speed, so a shared average would
-# be just as wrong here as it was for the Ollama-backed stages above.
+# be just as wrong here as it was for the LM-Studio-backed stages above.
 _WHISPER_MODEL_DEPENDENT_STAGES = {"transcribe"}
 
 # "transcribe" reports one unit per second of audio (see
@@ -667,14 +667,15 @@ def get_progress(job_id: str) -> JSONResponse:
         # that still says done:false (the client would then get a phantom
         # 404 on its next poll for a job that actually succeeded).
         done = job.done
-        # A dependency-fix job pulling an Ollama model (job.pull_log is not
-        # None) manages job.percent directly from real byte counts (see
-        # _run_dependency_fix_job) and never populates job.plan — calling
-        # _recompute_progress() for it would immediately zero job.percent
-        # back out (it resets to 0.0 whenever job.plan is empty, per its own
-        # docstring), clobbering every real update the moment this route is
-        # polled. The calibrated-duration model this recompute implements
-        # doesn't apply here anyway: Ollama already reports real progress.
+        # A streaming dependency-fix job (job.pull_log is not None) would
+        # manage job.percent directly from its own real progress signal (see
+        # pull_log's field comment above) rather than the calibrated-duration
+        # estimate _recompute_progress() computes — calling it here would
+        # immediately zero job.percent back out (it resets to 0.0 whenever
+        # job.plan is empty, per its own docstring), clobbering any such
+        # real update the moment this route is polled. No dependency-fix job
+        # currently sets pull_log (see that field's comment), so this branch
+        # is presently unreachable, but the guard is cheap to keep.
         if not done and job.pull_log is None:
             # Live-extrapolate from wall-clock time, not just the last
             # reported checkpoint — see _recompute_progress()'s docstring.
@@ -796,9 +797,11 @@ def _run_dependency_fix_job(job: _Job, name: str) -> None:
         # Written directly under job.lock rather than through
         # _make_callbacks()'s on_progress/on_plan — those drive the
         # calibrated-duration ETA model (see get_progress()'s matching
-        # comment for why that's actively wrong for this job kind), whereas
-        # real byte counts from Ollama are already an accurate percent with
-        # nothing to calibrate.
+        # comment for why that's wrong for a byte-count-driven download),
+        # whereas a real download's own byte counts are already an accurate
+        # percent with nothing to calibrate. No current caller invokes this
+        # (see pull_log's field comment on _Job) — kept as the mechanism a
+        # future streaming download would report through.
         with job.lock:
             job.pull_log = lines
             if percent is not None:

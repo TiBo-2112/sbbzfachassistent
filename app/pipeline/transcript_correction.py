@@ -24,11 +24,12 @@ just "happens" as part of analysis rather than being an opt-in switch.
 
 Sending the raw, unredacted transcript to the local LLM here follows the same
 already-established precedent as deep_check.find_candidates() (see that
-module's and app/pipeline/pipeline.py's docstrings): Ollama is always the
-local, never-networked instance, so there's no privacy cost to it seeing raw
-text before redaction — quite the opposite, redacting first would let
-Presidio's own mistakes corrupt the very passages this pass needs to read
-intact.
+module's and app/pipeline/pipeline.py's docstrings): the local LLM backend
+(LM Studio) is always the local, never-networked instance — see
+app/llm/lmstudio_client.py's docstring for how that's enforced — so there's
+no privacy cost to it seeing raw text before redaction — quite the opposite,
+redacting first would let Presidio's own mistakes corrupt the very passages
+this pass needs to read intact.
 
 Chunking is its own, simpler scheme than deep_check.py's — deliberately NOT
 reused:
@@ -44,31 +45,31 @@ reused:
   smaller than deep_check's (900-1200 words vs. 1800) — deep_check's
   extraction task always returns compact JSON regardless of input size, but
   this task's output is close to 1:1 with its input (the full corrected text
-  is echoed back), so a large input leaves much less headroom in
-  OLLAMA_NUM_CTX before quality degrades near the context limit.
+  is echoed back), so a large input leaves much less headroom in the model's
+  context window before quality degrades near the context limit.
 
-Ollama-unavailable handling is the one place this module departs from every
-other LLM call site in the app (deep_check.py, summarize.py): those are all
-gated behind an explicit user choice (the deep-check toggle, or choosing an
-output mode that includes a summary) — if you opted in and Ollama isn't
-there, a loud RuntimeError is a defensible contract. This pass runs for
-EVERY audio file unconditionally, including for users who never installed
-Ollama at all (the app is explicitly designed to work without it — see
+LM-Studio-unavailable handling is the one place this module departs from
+every other LLM call site in the app (deep_check.py, summarize.py): those are
+all gated behind an explicit user choice (the deep-check toggle, or choosing
+an output mode that includes a summary) — if you opted in and LM Studio
+isn't there, a loud RuntimeError is a defensible contract. This pass runs for
+EVERY audio file unconditionally, including for users who never started LM
+Studio at all (the app is explicitly designed to work without it — see
 Installationshinweise.md). A hard failure here would make audio
-transcription itself start requiring Ollama, which would be a real
-regression. `ollama_client.generate()`'s underlying `ollama.Client` is also
-constructed with an unbounded timeout (confirmed by reading the installed
-`ollama` package directly) — a fully-absent Ollama fails fast (connection
-refused), but a reachable-but-unresponsive one (e.g. a misconfigured
-OLLAMA_HOST) could hang indefinitely. So: only the first chunk is attempted
-unconditionally; the moment any chunk raises RuntimeError, every remaining
-chunk (including that one) is returned uncorrected with no further
-generate() calls for the rest of this run — bounding worst-case exposure to
-one hang per file while still degrading cleanly if Ollama dies partway
-through a long transcript. This is handled entirely in this module;
-app/llm/ollama_client.py itself (shared by deep_check.py and summarize.py,
-whose loud-fail contract is correct for their own opt-in features) is
-untouched.
+transcription itself start requiring LM Studio, which would be a real
+regression. Even though the OpenAI-compatible client `app.llm.client.generate()`
+now goes through (app/llm/lmstudio_client.py) uses a bounded default request
+timeout rather than an indefinite one, a reachable-but-unresponsive server
+could still stall this pass for a while per chunk — so the same
+degrade-once-and-stop design is kept regardless of backend: only the first
+chunk is attempted unconditionally; the moment any chunk raises
+RuntimeError, every remaining chunk (including that one) is returned
+uncorrected with no further generate() calls for the rest of this run —
+bounding worst-case exposure to one slow/failed call per file while still
+degrading cleanly if LM Studio dies partway through a long transcript. This
+is handled entirely in this module; app/llm/lmstudio_client.py itself
+(shared by deep_check.py and summarize.py, whose loud-fail contract is
+correct for their own opt-in features) is untouched.
 """
 
 from __future__ import annotations
@@ -85,7 +86,8 @@ _CORRECTION_TEMPERATURE = 0.2
 
 # Smaller than deep_check's 1800/2500 — see module docstring for why: this
 # task's output is close to 1:1 with its input length, unlike deep_check's
-# compact JSON output, so it needs more headroom in OLLAMA_NUM_CTX per chunk.
+# compact JSON output, so it needs more headroom in the model's context
+# window per chunk.
 _CHUNK_TARGET_WORDS = 1000
 _CHUNK_THRESHOLD_WORDS = 1300  # below this, a single call is not worth splitting
 
@@ -204,9 +206,9 @@ def correct_transcript(
         on_progress("transcript_correction", 0, len(chunks))
 
     corrected_chunks: list[str] = []
-    ollama_unavailable = False
+    llm_unavailable = False
     for i, chunk in enumerate(chunks):
-        if ollama_unavailable:
+        if llm_unavailable:
             corrected_chunks.append(chunk)
             continue
         try:
@@ -221,17 +223,17 @@ def correct_transcript(
             # with no user opt-in, so a failure degrades silently to the
             # uncorrected text instead of propagating. Deliberately does NOT
             # call on_progress for this failed attempt or any later skipped
-            # chunk — both complete near-instantly with no real Ollama call
-            # behind them, and reporting each as its own "chunk done" event
-            # would feed a string of near-zero durations into
+            # chunk — both complete near-instantly with no real LM Studio
+            # call behind them, and reporting each as its own "chunk done"
+            # event would feed a string of near-zero durations into
             # progress_calibration.py's per-chunk EMA, corrupting future
             # ETA estimates for this stage. A single jump straight to 100%
             # after the loop (below) keeps the progress bar honest without
             # polluting that average.
-            ollama_unavailable = True
+            llm_unavailable = True
             corrected_chunks.append(chunk)
 
-    if on_progress and ollama_unavailable:
+    if on_progress and llm_unavailable:
         on_progress("transcript_correction", len(chunks), len(chunks))
 
     return " ".join(corrected_chunks)
