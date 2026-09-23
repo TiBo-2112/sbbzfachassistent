@@ -12,8 +12,8 @@ def generate(
     prompt: str,
     system: str | None = None,
     temperature: float | None = None,
+    max_tokens: int = 2000,
 ) -> str:
-
     messages: list[dict[str, str]] = []
 
     if system:
@@ -26,6 +26,7 @@ def generate(
     kwargs = {
         "model": model,
         "messages": messages,
+        "max_tokens": max_tokens,
     }
 
     if temperature is not None:
