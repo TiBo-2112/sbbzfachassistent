@@ -12,8 +12,10 @@ the original file bytes, none of which cross the HTTP boundary.
 Deep-check's first LLM pass (`deep_check.find_candidates()`, called from
 `analyze()`) is handed the RAW, unredacted text. It used to run against a
 Presidio-redacted "preliminary" text instead, purely as an extra privacy
-precaution — but Ollama here is always the local instance (never reachable
-over the network either way), and that precaution had two real, observed
+precaution — but the local LLM backend (LM Studio; see
+app/llm/lmstudio_client.py's docstring for why it's guaranteed to be the
+local, never-networked instance this reasoning depends on) is never reachable
+over the network either way, and that precaution had two real, observed
 costs and no compensating benefit: Presidio's own NER mistakes could corrupt
 the very phrases the LLM needed to read intact (observed: a mis-tagged
 LOCATION span ate part of an unrelated sentence that contained a nickname),
@@ -273,7 +275,7 @@ def analyze_file(
         # analyze() resolves it again moments later for its own purposes, which
         # is cheap and harmless. See transcript_correction.py's module
         # docstring for why this has no user-facing toggle and how it degrades
-        # when Ollama isn't available.
+        # when LM Studio isn't available.
         resolved_language = _resolve_language(options.language_hint, detected_language)
         raw_text = correct_transcript(raw_text, resolved_language, on_progress=on_progress, on_plan=on_plan)
         source_filename = path.name

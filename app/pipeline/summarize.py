@@ -1,4 +1,4 @@
-"""Summarization of text via the local Ollama model.
+"""Summarization of text via the local LM Studio model.
 
 Normally given the final, fully-processed anonymized text (see
 app.pipeline.pipeline's module docstring: this is a correctness requirement,

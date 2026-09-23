@@ -1,9 +1,9 @@
 """Small persisted user-settings store for choices made in the Systemstatus
-UI's model pickers (Ollama chat model, faster-whisper size).
+UI's model pickers (LM Studio chat model, faster-whisper size).
 
 Each setting is layered under its app.config env-var fallback: an explicit
-env var (e.g. OLLAMA_MODEL/WHISPER_MODEL_SIZE set by Docker) always wins over
-the UI choice, since it is a deliberate deployment-level override, not a
+env var (e.g. LMSTUDIO_MODEL/WHISPER_MODEL_SIZE set by Docker) always wins
+over the UI choice, since it is a deliberate deployment-level override, not a
 locally-clicked preference. Otherwise the saved choice applies, falling back
 to the hardcoded default if nothing was ever saved.
 """
@@ -15,7 +15,6 @@ import os
 import threading
 
 from app.config import APP_DATA_DIR
-from app.config import OLLAMA_MODEL as _DEFAULT_OLLAMA_MODEL
 from app.config import LMSTUDIO_MODEL as _DEFAULT_LMSTUDIO_MODEL
 from app.config import WHISPER_MODEL_SIZE as _DEFAULT_WHISPER_MODEL_SIZE
 
@@ -47,13 +46,6 @@ def _set_setting(key: str, value: str) -> str:
         _SETTINGS_PATH.write_text(json.dumps(data), encoding="utf-8")
     return value
 
-
-def get_ollama_model() -> str:
-    return _get_setting("ollama_model", "OLLAMA_MODEL", _DEFAULT_OLLAMA_MODEL)
-
-
-def set_ollama_model(name: str) -> str:
-    return _set_setting("ollama_model", name)
 
 def get_lmstudio_model() -> str:
     return _get_setting(
